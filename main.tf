@@ -626,7 +626,6 @@ resource "aws_codedeploy_deployment_group" "my_deployment_group" {
   outdated_instances_strategy = "UPDATE"
 }
 
-
 # =======================================================
 # CODEPIPELINE Integration
 # =======================================================
@@ -672,4 +671,12 @@ resource "aws_codepipeline" "flask_pipeline" {
       }
     }
   }
+}
+
+# =======================================================
+# Output block
+# =======================================================
+output "alb_dns_name" {
+  value       = "http://${aws_lb.app_lb.dns_name}"
+  description = "The DNS name of the Application Load Balancer, with HTTP protocol"
 }
