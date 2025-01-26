@@ -625,3 +625,51 @@ resource "aws_codedeploy_deployment_group" "my_deployment_group" {
   # Outdated instances strategy
   outdated_instances_strategy = "UPDATE"
 }
+
+
+# =======================================================
+# CODEPIPELINE Integration
+# =======================================================
+resource "aws_codepipeline" "flask_pipeline" {
+  name     = "flask-pipeline"
+  role_arn = aws_iam_role.codepipeline_role.arn
+
+  artifact_store {
+    location = "terraform-state-and-file-bucket"  # Make sure this bucket exists in the same region as CodePipeline
+    type     = "S3"
+  }
+
+  # Source Stage: Pull the application code from S3
+  stage {
+    name = "Source"
+    action {
+      name             = "SourceAction"
+      category         = "Source"
+      owner            = "AWS"
+      provider         = "S3"
+      version          = "1"
+      output_artifacts = ["source_output"]  # This output artifact will be used by the next stage
+      configuration = {
+        S3Bucket    = "terraform-state-and-file-bucket"  # The S3 bucket where your source code is stored
+        S3ObjectKey = "my-flask-app.zip"  # The path to your source code (e.g., a .zip file in the bucket)
+      }
+    }
+  }
+
+  # Deploy Stage: Deploy using CodeDeploy
+  stage {
+    name = "Deploy"
+    action {
+      name             = "DeployAction"
+      category         = "Deploy"
+      owner            = "AWS"
+      provider         = "CodeDeploy"
+      version          = "1"
+      input_artifacts  = ["source_output"]  # This is the output from the Source stage
+      configuration = {
+        ApplicationName        = aws_codedeploy_app.flask_app.name  # Reference to the CodeDeploy application
+        DeploymentGroupName    = aws_codedeploy_deployment_group.my_deployment_group.deployment_group_name  # CodeDeploy deployment group
+      }
+    }
+  }
+}
