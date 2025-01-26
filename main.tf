@@ -506,7 +506,6 @@ resource "aws_iam_instance_profile" "ec2_instance_profile" {
   role = aws_iam_role.ec2_role.name
 }
 
-
 # =======================================================
 # COMPUTE RESOURCES - EC2 INSTANCES
 # =======================================================
@@ -576,3 +575,53 @@ resource "aws_instance" "app_server2" {
   }
 }
 
+# =======================================================
+# CODEDEPLOY
+# =======================================================
+
+# https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/codedeploy_app
+resource "aws_codedeploy_app" "flask_app" {
+  name = "flask_app"
+  compute_platform = "Server" # for EC2 instances
+}
+
+# https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/codedeploy_deployment_group
+# CodeDeploy Deployment Group
+resource "aws_codedeploy_deployment_group" "my_deployment_group" {
+  app_name              = aws_codedeploy_app.flask_app.name
+  deployment_group_name = "MyFlaskAppDeploymentGroup"
+  service_role_arn      = aws_iam_role.codedeploy_role.arn
+  
+  # Deployment style configuration
+  deployment_style {
+    deployment_type   = "IN_PLACE"
+    deployment_option = "WITH_TRAFFIC_CONTROL"
+  }
+
+  load_balancer_info {
+    elb_info {
+      name = aws_lb.app_lb.name
+    }
+    target_group_info {
+      name = aws_lb_target_group.app_tg.name
+    }
+  }
+  
+  # EC2 tag set configuration for filtering EC2 instances
+  ec2_tag_set {
+    ec2_tag_filter {
+      key    = "Name"
+      value  = "MyFlaskAppInstance"
+      type   = "KEY_AND_VALUE"
+    }
+  }
+
+  # Alarm configuration
+  alarm_configuration {
+    alarms  = ["my-alarm-name"]  # Ensure the alarm exists in CloudWatch
+    enabled = true
+  }
+
+  # Outdated instances strategy
+  outdated_instances_strategy = "UPDATE"
+}
