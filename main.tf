@@ -90,3 +90,114 @@ resource "aws_subnet" "private_subnet2" {
     Name = "private_subnet2"
   }
 }
+
+# =======================================================
+# https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/internet_gateway
+# INTERNET GATEWAY
+
+# Configure the internet gateway
+# Attached to the VPC to provide a connection to the public internet.
+# Required for public-facing resources like the NAT Gateway or Load Balancer to function.
+resource "aws_internet_gateway" "app_internet_gateway" {
+  vpc_id = aws_vpc.app_vpc.id
+
+  tags = {
+    Name = "app_internet_gateway"
+  }
+}
+
+# =======================================================
+# https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/eip
+# ELASTIC IP FOR NAT GATEWAY
+
+# Elastic IP for NAT Gateway
+# Allocates a static, public IP address.
+# This EIP is directly associated with the NAT Gateway, providing it with a public IP for outbound internet traffic.
+resource "aws_eip" "nat_eip" {
+  domain = "vpc"
+
+  tags = {
+    Name = "nat_elastic_ip"
+  }
+}
+
+# =======================================================
+# https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/nat_gateway
+# NAT GATEWAY
+
+# Configure NAT Gateway in Public Subnet
+# Deployed in the public subnet (10.0.1.0/24) and associated with the EIP.
+# Allows resources in private subnets to access the internet securely (e.g., for downloading updates).
+# Ensures incoming traffic to private subnets is blocked unless explicitly allowed by security groups.
+resource "aws_nat_gateway" "app_nat_gateway" {
+  allocation_id = aws_eip.nat_eip.id
+  subnet_id     = aws_subnet.public_subnet1.id
+
+  tags = {
+    Name = "app_nat_gateway"
+  }
+}
+
+# =======================================================
+# https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/route_table
+# ROUTE TABLE
+
+# Configure the route table for the Public Subnet
+# Routes all outbound traffic (0.0.0.0/0 and ::/0) to the Internet Gateway (IGW).
+# Associated with the public subnet to provide internet access.
+resource "aws_route_table" "public_route_table" {
+  vpc_id = aws_vpc.app_vpc.id
+
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.app_internet_gateway.id
+  }
+
+  tags = {
+    Name = "public_route_table"
+  }
+}
+
+# Configure the Private Route Table
+# Routes all outbound traffic (0.0.0.0/0) to the NAT Gateway.
+# Associated with private subnets to allow secure internet access for backend resources.
+resource "aws_route_table" "private_route_table" {
+  vpc_id = aws_vpc.app_vpc.id
+
+  route {
+    cidr_block     = "0.0.0.0/0"
+    nat_gateway_id = aws_nat_gateway.app_nat_gateway.id
+  }
+
+  tags = {
+    Name = "private_route_table"
+  }
+}
+
+# =======================================================
+# https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/route_table_association
+# ROUTE TABLE ASSOCIATION
+
+# Associate the Public Subnet with the Public Route Table
+# Public Subnet: Associated with the public route table to route traffic through the IGW.
+resource "aws_route_table_association" "public_subnet1_assoc" {
+  subnet_id      = aws_subnet.public_subnet1.id
+  route_table_id = aws_route_table.public_route_table.id
+}
+
+resource "aws_route_table_association" "public_subnet2_assoc" {
+  subnet_id      = aws_subnet.public_subnet2.id
+  route_table_id = aws_route_table.public_route_table.id
+}
+
+# Associate the Private Subnets with the Private Route Table
+# Private Subnets: Each is associated with the private route table to route traffic through the NAT Gateway.
+resource "aws_route_table_association" "private_subnet1_assoc" {
+  subnet_id      = aws_subnet.private_subnet1.id
+  route_table_id = aws_route_table.private_route_table.id
+}
+
+resource "aws_route_table_association" "private_subnet2_assoc" {
+  subnet_id      = aws_subnet.private_subnet2.id
+  route_table_id = aws_route_table.private_route_table.id
+}
