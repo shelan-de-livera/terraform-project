@@ -217,3 +217,101 @@ resource "aws_vpc_endpoint" "s3" {
 }
 
 
+# =======================================================
+# SECURITY GROUPS
+# =======================================================
+# https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/security_group
+
+# ALB SG allows  traffic from 0.0.0.0/0.
+# ALB SG allows outbound traffic to EC2 SG.
+resource "aws_security_group" "alb_sg" {
+  name = "application_load_balancer_security_group"
+  vpc_id      = aws_vpc.app_vpc.id
+
+  # Inbound traffic (HTTP) from anywhere (0.0.0.0/0)
+  ingress {
+    description = "HTTP"
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+# #   Inbound traffic (HTTPS) from anywhere (0.0.0.0/0)
+#   ingress {
+#     description = "HTTPS"
+#     from_port   = 443
+#     to_port     = 443
+#     protocol    = "tcp"
+#     cidr_blocks = ["0.0.0.0/0"]
+#   }
+
+  # Allow all outbound traffic
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    # security_groups = [aws_security_group.ec2_sg.id]
+    cidr_blocks = ["0.0.0.0/0"]  
+    # Use the Elastic IP in CIDR format (e.g., <eip_address>/32)
+    # cidr_blocks = ["${aws_eip.nat_eip.public_ip}/32"] # Restrict outbound traffic to NAT Gateway
+    # cidr_blocks = ["aws_eip.nat_eip.public_ip"]  # Restrict outbound traffic to NAT Gateway
+    # cidr_blocks = [aws_eip.nat_eip.public_ip + "/32"] # Restrict outbound traffic to NAT Gateway
+  }
+
+  tags = {
+    Name = "alb_sg"
+  }
+}
+
+# EC2 SG allows inbound traffic from ALB SG.
+# EC2 SG allows outbound traffic to NAT Gateway (if required).
+resource "aws_security_group" "ec2_sg" {
+  name = "ec2_security_group"
+  vpc_id      = aws_vpc.app_vpc.id
+
+  # Inbound traffic (HTTP) from the ALB security group
+  ingress {
+    description = "HTTP"
+    from_port       = 80
+    to_port         = 80
+    protocol        = "tcp"
+    security_groups = [aws_security_group.alb_sg.id]
+  }
+
+# temporary
+  ingress {
+    description = "SSH"
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"] 
+  }
+
+#   # Inbound traffic (HTTPS) from the ALB security group
+#   ingress {
+#     description    = "HTTPS"
+#     from_port      = 443
+#     to_port        = 443
+#     protocol       = "tcp"
+#     security_groups = [aws_security_group.alb_sg.id]  
+#   }
+
+  # Allow outbound traffic to the NAT Gateway (using the Elastic IP of the NAT Gateway)
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    # Use the Elastic IP in CIDR format (e.g., <eip_address>/32)
+    # cidr_blocks = ["${aws_eip.nat_eip.public_ip}/32"] # Restrict outbound traffic to NAT Gateway
+    cidr_blocks = ["0.0.0.0/0"]  
+    # cidr_blocks = ["aws_eip.nat_eip.public_ip"]  # Restrict outbound traffic to NAT Gateway
+    # cidr_blocks = [aws_eip.nat_eip.public_ip + "/32"] # Restrict outbound traffic to NAT Gateway
+  }
+
+  tags = {
+    Name = "ec2_sg"
+  }
+}
+
+
