@@ -506,3 +506,73 @@ resource "aws_iam_instance_profile" "ec2_instance_profile" {
   role = aws_iam_role.ec2_role.name
 }
 
+
+# =======================================================
+# COMPUTE RESOURCES - EC2 INSTANCES
+# =======================================================
+# https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/instance
+
+resource "aws_instance" "app_server1" {
+  ami           = "ami-0e2c8caa4b6378d8c"  # Replace with a valid AMI ID
+  instance_type = "t3.micro"
+  availability_zone = "us-east-1a"
+  key_name = "aws-access-main-key"
+#   iam_instance_profile = aws_iam_role.ec2_role.name
+  iam_instance_profile = aws_iam_instance_profile.ec2_instance_profile.name
+  subnet_id     = aws_subnet.private_subnet1.id
+  security_groups = [
+    aws_security_group.ec2_sg.id
+  ]
+
+  user_data = <<-EOF
+              #!/bin/bash
+              exec > >(tee /var/log/user-data.log|logger -t user-data -s 2>/dev/console) 2>&1
+              apt-get update -y
+              apt-get install -y python3 python3-pip unzip awscli
+              cd /home/ubuntu
+              aws s3 cp s3://terraform-state-and-file-bucket/my-flask-app.zip .
+              unzip my-flask-app.zip
+              cd my-flask-app
+              pip3 install -r requirements.txt
+              chmod +x scripts/install_dependencies.sh scripts/start_app.sh
+              ./scripts/install_dependencies.sh
+              ./scripts/start_app.sh
+              EOF
+
+  tags = {
+    Name = "app_server1"
+  }
+}
+
+resource "aws_instance" "app_server2" {
+  ami           = "ami-0e2c8caa4b6378d8c"  # Replace with a valid AMI ID
+  instance_type = "t3.micro"
+  availability_zone = "us-east-1b"
+  key_name = "aws-access-main-key"
+#   iam_instance_profile = aws_iam_role.ec2_role.name
+  iam_instance_profile = aws_iam_instance_profile.ec2_instance_profile.name
+  subnet_id     = aws_subnet.private_subnet2.id
+  security_groups = [
+    aws_security_group.ec2_sg.id
+  ]
+
+  user_data = <<-EOF
+              #!/bin/bash
+              exec > >(tee /var/log/user-data.log|logger -t user-data -s 2>/dev/console) 2>&1
+              apt-get update -y
+              apt-get install -y python3 python3-pip unzip awscli
+              cd /home/ubuntu
+              aws s3 cp s3://terraform-state-and-file-bucket/my-flask-app.zip .
+              unzip my-flask-app.zip
+              cd my-flask-app
+              pip3 install -r requirements.txt
+              chmod +x scripts/install_dependencies.sh scripts/start_app.sh
+              ./scripts/install_dependencies.sh
+              ./scripts/start_app.sh
+              EOF
+
+  tags = {
+    Name = "app_server2"
+  }
+}
+
