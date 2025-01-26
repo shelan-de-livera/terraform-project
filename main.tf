@@ -201,3 +201,19 @@ resource "aws_route_table_association" "private_subnet2_assoc" {
   subnet_id      = aws_subnet.private_subnet2.id
   route_table_id = aws_route_table.private_route_table.id
 }
+
+# =======================================================
+# https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/vpc_endpoint
+# VPC ENDPOINT FOR S3
+
+# EC2 SG allows outbound HTTP traffic to S3 VPC Endpoint.
+resource "aws_vpc_endpoint" "s3" {
+  vpc_id       = aws_vpc.app_vpc.id
+  service_name = "com.amazonaws.us-east-1.s3"
+
+  route_table_ids = [
+    aws_route_table.private_route_table.id
+  ]
+}
+
+
