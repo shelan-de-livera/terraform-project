@@ -391,4 +391,118 @@ resource "aws_lb_target_group_attachment" "app_tg_attachment2" {
   port             = 80
 }
 
+# =======================================================
+# IAM
+# =======================================================
+
+# https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_policy
+
+# IAM Policy to allow EC2 instances to access S3 bucket for both reading and writing
+resource "aws_iam_policy" "ec2_s3_policy" {
+  name        = "ec2_s3_access_policy"
+  description = "Policy to allow EC2 instances to read/write to S3 (specifically the terraform state file)"
+
+  # Custom policy that allows both 'GetObject' (read) and 'PutObject' (write) on the S3 bucket
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect    = "Allow"
+        Action    = [
+          "s3:GetObject",
+          "s3:ListBucket"
+        ]
+        Resource  = [
+          "arn:aws:s3:::terraform-state-and-file-bucket",                     # Bucket level for listing
+          "arn:aws:s3:::terraform-state-and-file-bucket/terraform/*"            # Object level for state file
+        ]
+      },
+      {
+        Effect    = "Allow"
+        Action    = "s3:PutObject"
+        Resource  = "arn:aws:s3:::terraform-state-and-file-bucket/terraform/state.tfstate" # For state file write
+      }
+    ]
+  })
+}
+
+# https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role
+# IAM Role for EC2 instances
+resource "aws_iam_role" "ec2_role" {
+  name               = "ec2_s3_access_role"
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect    = "Allow"
+        Action    = "sts:AssumeRole"
+        Principal = {
+          Service = "ec2.amazonaws.com"
+        }
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role" "codedeploy_role" {
+  name               = "CodeDeployEC2Role"
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Action    = "sts:AssumeRole",
+        Principal = {
+          Service = "codedeploy.amazonaws.com"
+        },
+        Effect    = "Allow",
+        Sid       = ""
+      }
+    ]
+  })
+}
+
+# IAM Role for CodePipeline
+resource "aws_iam_role" "codepipeline_role" {
+  name = "codepipeline-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Action    = "sts:AssumeRole"
+      Effect    = "Allow"
+      Principal = {
+        Service = "codepipeline.amazonaws.com"
+      }
+    }]
+  })
+}
+
+# =======================================================
+# https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_policy_attachment
+# Attach IAM policy to role
+
+resource "aws_iam_role_policy_attachment" "attach_policy_to_role" {
+  policy_arn = aws_iam_policy.ec2_s3_policy.arn
+  role       = aws_iam_role.ec2_role.name
+}
+
+# Attach necessary policies to allow access to S3 and CodeDeploy
+resource "aws_iam_role_policy_attachment" "ec2_role_codedeploy_policy1" {
+  role       = aws_iam_role.ec2_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonS3FullAccess"
+}
+
+resource "aws_iam_role_policy_attachment" "ec2_role_codedeploy_policy2" {
+  role       = aws_iam_role.ec2_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AWSCodeDeployFullAccess"
+}
+
+# =======================================================
+# https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_instance_profile
+# IAM Instance Profile for EC2 instances
+
+resource "aws_iam_instance_profile" "ec2_instance_profile" {
+  name = "ec2-instance-profile"
+  role = aws_iam_role.ec2_role.name
+}
 
