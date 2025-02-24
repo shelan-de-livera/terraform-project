@@ -1,0 +1,1 @@
+# No variables needed in this file since they are all defined in the modules
