@@ -13,7 +13,8 @@ variable "app_server1_az" {
   default = "us-east-1a"
 }
 
-variable "key_name" {}
+# variable "key_name" {}
+variable "public_key" {}
 
 variable "app_server2_az" {
   type = string

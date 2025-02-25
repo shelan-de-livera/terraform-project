@@ -38,7 +38,6 @@ module "iam" {
 # Instances Module
 module "instances" {
   source = "./modules/instances"
-  key_name = "aws-access-main-key"
   s3_bucket_name = "terraform-state-and-file-bucket"
   depends_on = [
     module.iam,
