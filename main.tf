@@ -40,7 +40,6 @@ module "instances" {
   source = "./modules/instances"
   key_name = "aws-access-main-key"
   s3_bucket_name = "terraform-state-and-file-bucket"
-  # You might need to adjust these dependencies based on your instance setup
   depends_on = [
     module.iam,
     module.security,
@@ -53,7 +52,6 @@ module "loadbalancer" {
   source = "./modules/loadbalancer"
   vpc_id = module.networking.vpc_id
   public_subnet_ids = module.networking.public_subnet_ids
-  # You might need to adjust these dependencies based on your instance setup
   depends_on = [
     module.instances,
     module.security
